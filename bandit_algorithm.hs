@@ -35,11 +35,10 @@ takeAction S = randomRIO (0.4, 0.6)
 selectAction :: [ (Action, Double) ] -> Double -> IO Action
 selectAction qs epsilon = do
     p <- randomIO :: IO Double
-    if p > epsilon then
-        return qBest
-    else
-        do i <- randomRIO (0, -1 + length qs')
-           return . fst $ qs' !! i
+    if p > epsilon
+       then return qBest
+       else do i <- randomRIO (0, -1 + length qs')
+               return . fst $ qs' !! i
     where best = maximum $ map snd qs
           qBest = revLookup best qs
           qBestPair = lookupPair qBest qs
