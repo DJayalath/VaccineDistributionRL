@@ -23,7 +23,8 @@ administer qs ns epsilon t = do
     administer qs' ns' epsilon $ t - 1 
 
 -- | Provides a reward function given a choice of action
--- This function is 'plug and play'. Replace with an input of real data (or a better model)
+-- This function is 'plug and play'. Replace with an input of real data (or a better model).
+-- You can ignore this function otherwise, it is merely for testing.
 takeAction :: Action -> IO Double
 takeAction O = randomRIO (0.33, 0.66)
 takeAction P = randomRIO (0.70, 0.9)
