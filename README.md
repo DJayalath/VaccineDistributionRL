@@ -1,12 +1,13 @@
 # RL Algorithms for Vaccine Distribution
-Attempts at optimising vaccine distribution using reinforcement learning.
+Attempts at modelling optimal vaccine distribution using reinforcement learning. Solutions are basic prototypes for
+implementing ideas below.
 
 ## Problem 1 : Distribution of vaccine types
 A government is in posession of several different vaccines (e.g. Pfizer, Moderna, Oxford, Sinovac) but does not
 know the true efficacy of these vaccines. How should they be distributed among the population to optimise
 efficacy?
 
-### Idea: Bandit Algorithm
+### Idea : Bandit Algorithm
 Use a bandit algorithm (single state Markov Decision Process) to learn the efficacy and quickly converge to an
 optimal distribution of vaccines, balancing exploration vs exploitation.
 
