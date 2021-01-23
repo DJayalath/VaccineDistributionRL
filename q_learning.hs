@@ -1,4 +1,4 @@
--- A q learning algorithm for optimising efficacy from mixed vaccine dosages.
+-- A q learning algorithm for optimising efficacy from mixed vaccine doses.
 -- This might be useful for investigating the efficacy of mixing the type of vaccine given in the first and
 -- second doses if this leads to faster vaccination of the population given limited supply.
 
@@ -6,8 +6,9 @@ import Data.List
 import Data.Ord
 import System.Random
 
--- Actions represent the different available vaccines (Oxford / Pfizer / Moderna / Sinovac)
+-- Actions represent the different available vaccines that can be given (Oxford / Pfizer / Moderna / Sinovac)
 data Action = O | P | M | S | None deriving (Show, Read, Ord, Eq)
+-- Represents the vaccine given in the first and second dose
 type State = (Action, Action)
 -- Represents an association of a state/action pair (S, A) with Q(S, A)
 type ActionQ = ((State, Action), Double)
@@ -16,15 +17,16 @@ actions = [ O, P, M, S, None ]
 
 initStates = [ (a1, a2) | a1 <- actions, a2 <- actions ]
 
+-- Initial value of all states is zero (pass this to administer initially).
 initQs = [ ((s, a), 0.0) | s <- initStates, a <- actions ]
 
 -- | Administers vaccines with epsilon greedy strategy.
--- Completes t loops (t = population size).
+-- Completes t loops (t = number of doses to distribute).
 administer :: [ ActionQ ] -> State -> Double -> Double -> Double -> Int -> IO [ ActionQ ]
 administer qs s gamma epsilon eta 0 = return qs
 administer qs s gamma epsilon eta t = do 
     a <- selectAction qs s epsilon
-    (s', r) <- takeAction (fst . fst $ a) (snd . fst $ a)
+    (s', r) <- uncurry takeAction $ fst a
     administer (updateQ qs a s' r eta gamma) s' gamma epsilon eta $ t - 1 
 
 -- | Selects actions using an epsilon greedy strategy
@@ -43,28 +45,20 @@ selectAction qs s epsilon = do
               r <- mr
               return $ delete bestAction qs !! r
 
--- | Updates estimate for Q(A) : Q(A) <- Q(A) + (1 / N(A)) * (R - Q(A))
+-- | Updates estimate for Q(S, A) : Q(S, A) <- Q(S, A) + eta * (R(S') + gamma * max Q(S', A) - Q(S, A))
 updateQ :: [ ActionQ ] -> ActionQ -> State -> Double -> Double -> Double -> [ ActionQ ]
 updateQ qs ((s, a), q) s' r eta gamma = ((s, a), q') : delete ((s, a), q) qs
-    where nextStates = getStates s a
-          bestNextAction | null nextStates = 0.0
-                         | otherwise = snd . maximumBy (comparing snd) $ filter ((`elem` getStates s a) . fst) qs 
-          q' = q + eta * (r + gamma * bestNextAction - q)
+    where reachable = nextStates s a
+          qBestNext | null reachable = 0.0
+                    | otherwise = snd . maximumBy (comparing snd) $ filter ((`elem` nextStates s a) . fst) qs 
+          q' = q + eta * (r + gamma * qBestNext - q)
 
 -- | Computes states reachable from current state after taking action a
-getStates :: State -> Action -> [ (State, Action) ]
-getStates (None, None) a = [ ((a, b), b) | b <- actions ]
-getStates (_, _) _ = []
+nextStates :: State -> Action -> [ (State, Action) ]
+nextStates (None, None) a = [ ((a, b), b) | b <- actions ]
+nextStates (_, _) _ = []
 
-
--- | Provides a lookup for records with a runtime error (that should never occur)
--- in the event the record doesn't exist.
-safeLookup :: Eq a => a -> [ (a, b) ] -> b
-safeLookup x xs = case lookup x xs of
-                    Just y -> y
-                    Nothing -> error "Failed to lookup"
-
--- | Provides a reward function given a choice of action                                    
+-- | Provides a reward function given a choice of action from a state
 -- This function is 'plug and play'. Replace with an input of real data (or a better model).
 -- You can ignore this function otherwise, it is merely for testing.                        
 takeAction :: State -> Action -> IO (State, Double)                                                           
