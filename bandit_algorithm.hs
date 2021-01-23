@@ -2,67 +2,65 @@
 -- of coronavirus vaccine administration choice.
 -- This models the optimal delivery of vaccines to maximise overall efficacy within a population
 -- given unknown efficacy of each individual vaccine.
--- The algorithm uses an epsilon greedy strategy to attempt to balance exploration vs exploitation and
--- reach convergence with the true optimal distribution as quickly as possible.
+-- The algorithm uses an epsilon greedy strategy for exploration vs exploitation balancing
 
 import Data.List
+import Data.Ord
 import System.Random
 
 -- Actions represent the different available vaccines (Oxford / Pfizer / Moderna / Sinovac)
 data Action = O | P | M | S deriving (Show, Read, Ord, Eq)
+-- Represents an association of an action A with Q(A) and N(A)
+type ActionQN = (Action, (Double, Double))
 
--- | Maximises long term efficacy from administering selection of vaccine.
--- Takes a list of estimated rewards, number of times given, epsilon, and number of vaccines to administer.
-administer :: [ (Action, Double) ] -> [ (Action, Double) ] -> Double -> Int -> IO [ (Action, Double) ]
-administer qs _ _ 0 = return qs
-administer qs ns epsilon t = do 
-    a <- selectAction qs epsilon
-    r <- takeAction a
-    let ns' = updateN ns a
-    let qs' = updateQ qs ns' a r
-    administer qs' ns' epsilon $ t - 1 
+initAqns = [ (O, (0.0, 0.0)), (P, (0.0, 0.0)), (M, (0.0, 0.0)), (S, (0.0, 0.0))  ]
 
--- | Provides a reward function given a choice of action
--- This function is 'plug and play'. Replace with an input of real data (or a better model).
--- You can ignore this function otherwise, it is merely for testing.
-takeAction :: Action -> IO Double
-takeAction O = randomRIO (0.33, 0.66)
-takeAction P = randomRIO (0.70, 0.9)
-takeAction M = randomRIO (0.6, 0.95)
-takeAction S = randomRIO (0.4, 0.6)
+-- | Administers vaccines with epsilon greedy strategy.
+-- Completes t loops (t = population size).
+administer :: [ ActionQN ] -> Double -> Int -> IO [ ActionQN ]
+administer aqns epsilon 0 = return aqns
+administer aqns epsilon t = do 
+    a <- selectAction aqns epsilon
+    r <- takeAction . fst $ a
+    administer (updateQ r $ updateN aqns a) epsilon $ t - 1 
 
 -- | Selects actions using an epsilon greedy strategy
-selectAction :: [ (Action, Double) ] -> Double -> IO Action
-selectAction qs epsilon = do
+selectAction :: [ ActionQN ] -> Double -> IO ActionQN
+selectAction aqns epsilon = do
+
     p <- randomIO :: IO Double
     if p > epsilon
-       then return qBest
-       else do i <- randomRIO (0, -1 + length qs')
-               return . fst $ qs' !! i
-    where best = maximum $ map snd qs
-          qBest = revLookup best qs
-          qBestPair = lookupPair qBest qs
-          qs' = delete qBestPair qs
+       then return bestAction
+       else pickRand $ randomRIO (0, length aqns - 2)
+
+    where bestAction = maximumBy (comparing $ fst . snd) aqns
+          pickRand mr = do
+              r <- mr
+              return $ delete bestAction aqns !! r
 
 -- | Updates estimate for Q(A) : Q(A) <- Q(A) + (1 / N(A)) * (R - Q(A))
-updateQ :: [ (Action, Double) ] -> [ (Action, Double) ] -> Action -> Double -> [ (Action, Double) ]
-updateQ qs ns a r = (a, d + delta) : delete q qs
-    where q@(_, d) = lookupPair a qs
-          delta = (1.0 / (qLookup a ns)) * (r - d)
+updateQ :: Double -> (ActionQN, [ ActionQN ])-> [ ActionQN ]
+updateQ r ((a, (q, n)), aqns) = (a, (q', n)) : delete (a, (q, n)) aqns
+    where q' = q + (1.0 / n) * (r - q)
 
 -- | Updates N(A) : N(A) <- N(A) + 1
-updateN :: [ (Action, Double) ] -> Action -> [ (Action, Double) ]
-updateN ns a = (a, i + 1) : delete n ns
-    where n@(_, i) = lookupPair a ns
+updateN :: [ ActionQN ] -> ActionQN -> (ActionQN, [ ActionQN ])
+updateN aqns (a, (q, n)) = (aqn, aqn : delete (a, (q, n)) aqns)
+    where aqn = (a, (q, n + 1))
 
--- | Looks up a pair using the first element
-lookupPair :: Eq a => a -> [ (a, b) ] -> (a, b)
-lookupPair v = head . filter (\(x, y) -> x == v)
+-- | Provides a lookup for records with a runtime error (that should never occur)
+-- in the event the record doesn't exist.
+safeLookup :: Eq a => a -> [ (a, b) ] -> b
+safeLookup x xs = case lookup x xs of
+                    Just y -> y
+                    Nothing -> error "Failed to lookup"
 
--- | Looks up the second element of a pair using the first
-qLookup :: Eq a => a -> [ (a, b) ] -> b
-qLookup v = snd . lookupPair v
-
--- | Looks up the first element of a pair using the second
-revLookup :: Eq b => b -> [ (a, b) ] -> a
-revLookup v = qLookup v . map (\(x, y) -> (y, x))
+-- | Provides a reward function given a choice of action                                    
+-- This function is 'plug and play'. Replace with an input of real data (or a better model).
+-- You can ignore this function otherwise, it is merely for testing.                        
+takeAction :: Action -> IO Double                                                           
+takeAction O = randomRIO (0.33, 0.66)                                                       
+takeAction P = randomRIO (0.70, 0.9)                                                        
+takeAction M = randomRIO (0.6, 0.95)                                                        
+takeAction S = randomRIO (0.4, 0.6)                                                         
+                                                                                            
