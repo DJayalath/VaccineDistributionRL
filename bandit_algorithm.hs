@@ -48,13 +48,6 @@ updateN :: [ ActionQN ] -> ActionQN -> (ActionQN, [ ActionQN ])
 updateN aqns (a, (q, n)) = (aqn, aqn : delete (a, (q, n)) aqns)
     where aqn = (a, (q, n + 1))
 
--- | Provides a lookup for records with a runtime error (that should never occur)
--- in the event the record doesn't exist.
-safeLookup :: Eq a => a -> [ (a, b) ] -> b
-safeLookup x xs = case lookup x xs of
-                    Just y -> y
-                    Nothing -> error "Failed to lookup"
-
 -- | Provides a reward function given a choice of action                                    
 -- This function is 'plug and play'. Replace with an input of real data (or a better model).
 -- You can ignore this function otherwise, it is merely for testing.                        
